@@ -1,5 +1,11 @@
 #include "systemcalls.h"
-
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+#include <fcntl.h>
 /**
  * @param cmd the command to execute with system()
  * @return true if the command in @param cmd was executed
@@ -17,7 +23,7 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    return system(cmd) == 0;
 }
 
 /**
@@ -46,8 +52,8 @@ bool do_exec(int count, ...)
     }
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+    // without first element/ and may be removed
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -59,9 +65,33 @@ bool do_exec(int count, ...)
  *
 */
 
-    va_end(args);
+    if (command[0][0] != '/') {
+	 //   printf("wrong string is %s \n", command[0]);
 
-    return true;
+    	return false;
+    }
+    //printf("string is %s \n", command[0]);
+    pid_t pid;
+    int status;
+    pid = fork();
+    if (pid == -1) 
+	    return -1;
+    else if (pid == 0) {
+    	    execv(command[0], &command[0]);
+	exit (-1);
+    }
+    if (waitpid(pid, &status, 0) == -1) {
+	    return false;
+    }
+    else if (WIFEXITED (status)) {
+
+	    printf("command is %s, exit code is %d", command[0], WEXITSTATUS(status));
+	    va_end(args);
+	    
+	    return WEXITSTATUS(status) == 0;
+    }
+    va_end(args);
+    return false;
 }
 
 /**
@@ -74,6 +104,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_list args;
     va_start(args, count);
     char * command[count+1];
+    int status;
     int i;
     for(i=0; i<count; i++)
     {
@@ -84,6 +115,33 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     // and may be removed
     command[count] = command[count];
 
+    int kidpid;
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) { perror("open"); abort(); }
+    switch (kidpid = fork()) {
+	case -1: perror("fork"); abort();
+	case 0:
+		if (dup2(fd,1) < 0) { perror("dup2"); abort(); }
+		close(fd);
+		execvp(command[0], &command[0]); perror("execvp"); abort();
+	default:
+		close(fd);
+    }
+
+      if (waitpid(kidpid, &status, 0) == -1) {
+            return -1;
+    }
+    else if (WIFEXITED (status)) {
+
+            printf("command is %s, exit code is %d", command[0], WEXITSTATUS(status));
+            va_end(args);
+
+            return WEXITSTATUS(status) == 0;
+    }
+
+    return false;
+
+	
 
 /*
  * TODO
@@ -92,7 +150,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
+	
     va_end(args);
 
     return true;
