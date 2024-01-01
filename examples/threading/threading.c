@@ -46,7 +46,8 @@ bool start_thread_obtaining_mutex(pthread_t *thread, pthread_mutex_t *mutex,int 
      if (0 != pthread_create(thread, NULL, threadfunc, (void *) data)) 
      {
 	  printf("error spawning the thread");
-	 return false;
+		free(data);
+	  return false;
      }     
 
 // free(data);
